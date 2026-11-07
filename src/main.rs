@@ -3,7 +3,9 @@ use std::io;
 use std::process;
 
 fn match_pattern(input_line: &str, pattern: &str) -> bool {
-    if pattern.chars().count() == 1 {
+    if pattern == r"\d" {
+        input_line.chars().any(|c| c.is_ascii_digit())
+    } else if pattern.chars().count() == 1 {
         input_line.contains(pattern)
     } else {
         panic!("Unhandled pattern: {}", pattern)
@@ -29,5 +31,15 @@ fn main() {
         process::exit(0)
     } else {
         process::exit(1)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn digit_class() {
+        assert!(match_pattern("foo101", r"\d"));
+        assert!(!match_pattern("Art", r"\d"));
     }
 }
