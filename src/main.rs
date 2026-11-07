@@ -7,9 +7,13 @@ fn match_pattern(input_line: &str, pattern: &str) -> bool {
         input_line.chars().any(|c| is_digit(c))
     } else if pattern == r"\w" {
         input_line.chars().any(|c| is_word(c))
-    } else if pattern.starts_with('[') && pattern.ends_with(']') && pattern.len() > 2 {
-        let group = &pattern[1..pattern.len() - 1];
-        input_line.chars().any(|c| group.contains(c))
+    } else if let Some(group) = pattern.strip_prefix('[')
+        .and_then(|p| p.strip_suffix(']')) {
+        if let Some(negated) = group.strip_prefix('^') {
+            input_line.chars().any(|c| !negated.contains(c))
+        } else {
+            input_line.chars().any(|c| group.contains(c))
+        }
     } else if pattern.chars().count() == 1 {
         input_line.contains(pattern)
     } else {
@@ -19,7 +23,6 @@ fn match_pattern(input_line: &str, pattern: &str) -> bool {
 
 // Usage: echo <input_text> | your_program.sh -E <pattern>
 fn main() {
-    // You can use print statements as follows for debugging, they'll be visible when running tests.
     eprintln!("Logs from your program will appear here!");
 
     if env::args().nth(1).unwrap() != "-E" {
@@ -31,6 +34,7 @@ fn main() {
     let mut input_line = String::new();
 
     io::stdin().read_line(&mut input_line).unwrap();
+    let input_line = input_line.trim_end_matches(['\n', '\r']);
 
     if match_pattern(&input_line, &pattern) {
         process::exit(0)
@@ -69,5 +73,12 @@ mod tests {
         assert!(match_pattern("cab", "[abc]"));
         assert!(!match_pattern("dog", "[abc]"));
         assert!(match_pattern("a1b2c3", "[123]"));
+    }
+
+    #[test]
+    fn negative_group() {
+        assert!(match_pattern("cat", "[^abc]"));
+        assert!(!match_pattern("cab", "[^abc]"));
+        assert!(match_pattern("apple", "[^abc]"));
     }
 }
