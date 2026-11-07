@@ -7,6 +7,9 @@ fn match_pattern(input_line: &str, pattern: &str) -> bool {
         input_line.chars().any(|c| is_digit(c))
     } else if pattern == r"\w" {
         input_line.chars().any(|c| is_word(c))
+    } else if pattern.starts_with('[') && pattern.ends_with(']') && pattern.len() > 2 {
+        let group = &pattern[1..pattern.len() - 1];
+        input_line.chars().any(|c| group.contains(c))
     } else if pattern.chars().count() == 1 {
         input_line.contains(pattern)
     } else {
@@ -51,5 +54,20 @@ mod tests {
     fn digit_class() {
         assert!(match_pattern("foo101", r"\d"));
         assert!(!match_pattern("Art", r"\d"));
+    }
+
+    #[test]
+    fn word_class() {
+        assert!(match_pattern("alpha_num3ric", r"\w"));
+        assert!(match_pattern("_", r"\w"));
+        assert!(!match_pattern("$!?", r"\w"));
+    }
+
+    #[test]
+    fn positive_group() {
+        assert!(match_pattern("apple", "[abc]"));
+        assert!(match_pattern("cab", "[abc]"));
+        assert!(!match_pattern("dog", "[abc]"));
+        assert!(match_pattern("a1b2c3", "[123]"));
     }
 }
