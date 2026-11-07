@@ -4,7 +4,9 @@ use std::process;
 
 fn match_pattern(input_line: &str, pattern: &str) -> bool {
     if pattern == r"\d" {
-        input_line.chars().any(|c| c.is_ascii_digit())
+        input_line.chars().any(|c| is_digit(c))
+    } else if pattern == r"\w" {
+        input_line.chars().any(|c| is_word(c))
     } else if pattern.chars().count() == 1 {
         input_line.contains(pattern)
     } else {
@@ -32,6 +34,14 @@ fn main() {
     } else {
         process::exit(1)
     }
+}
+
+fn is_digit(c: char) -> bool {
+    c.is_ascii_digit()
+}
+
+fn is_word(c: char) -> bool {
+    c.is_ascii_alphanumeric() || c == '_'
 }
 
 #[cfg(test)]
