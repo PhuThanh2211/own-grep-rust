@@ -62,8 +62,14 @@ fn match_here(input: &[char], tokens: &[Token]) -> bool {
 }
 
 fn match_pattern(input_line: &str, pattern: &str) -> bool {
-    let tokens = parse(pattern);
     let input: Vec<char> = input_line.chars().collect();
+
+    if let Some(rest) = pattern.strip_prefix('^') {
+        let tokens = parse(rest);
+        return match_here(&input, &tokens);
+    }
+
+    let tokens = parse(pattern);
     (0..=input.len()).any(|start| match_here(&input[start..], &tokens))
 }
 
@@ -128,5 +134,14 @@ mod tests {
         assert!(!match_pattern("I got 1 apple from the store", r"\d\d\d apples"));
         assert!(match_pattern("4 cats", r"\d \w\w\ws"));
         assert!(!match_pattern("1 dog", r"\d \w\w\ws"));
+    }
+
+    #[test]
+    fn start_anchor() {
+        assert!(match_pattern("log", "^log"));
+        assert!(match_pattern("logs", "^log"));
+        assert!(!match_pattern("slog", "^log"));
+        assert!(match_pattern("123abc", r"^\d\d\d"));
+        assert!(match_pattern("cat", "[^abc]"));
     }
 }
