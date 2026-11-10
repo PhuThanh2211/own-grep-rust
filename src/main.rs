@@ -51,11 +51,11 @@ fn parse(pattern: &str) -> Vec<Token> {
     }
     tokens
 }
-fn match_here(input: &[char], tokens: &[Token]) -> bool {
+fn match_here(input: &[char], tokens: &[Token], end_anchored: bool) -> bool {
     match tokens.split_first() {
-        None => true, // every token has matched
+        None => !end_anchored || input.is_empty(),
         Some((tok, rest)) => match input.split_first() {
-            Some((&c, input_rest)) if tok.matches(c) => match_here(input_rest, rest),
+            Some((&c, input_rest)) if tok.matches(c) => match_here(input_rest, rest, end_anchored),
             _ => false,
         },
     }
@@ -64,13 +64,23 @@ fn match_here(input: &[char], tokens: &[Token]) -> bool {
 fn match_pattern(input_line: &str, pattern: &str) -> bool {
     let input: Vec<char> = input_line.chars().collect();
 
-    if let Some(rest) = pattern.strip_prefix('^') {
-        let tokens = parse(rest);
-        return match_here(&input, &tokens);
-    }
+    let (start_anchored, pattern) = match pattern.strip_prefix('^') {
+        Some(p) => (true, p),
+        None => (false, pattern)
+    };
+
+    let (end_anchored, pattern) = match pattern.strip_suffix('$') {
+        Some(p) if !p.ends_with('\\') => (true, p), // `\$` is a literal dollar
+        _ => (false, pattern)
+    };
 
     let tokens = parse(pattern);
-    (0..=input.len()).any(|start| match_here(&input[start..], &tokens))
+
+    if start_anchored {
+        match_here(&input, &tokens, end_anchored)
+    } else {
+        (0..=input.len()).any(|start| match_here(&input[start..], &tokens, end_anchored))
+    }
 }
 
 // Usage: echo <input_text> | your_program.sh -E <pattern>
@@ -143,5 +153,17 @@ mod tests {
         assert!(!match_pattern("slog", "^log"));
         assert!(match_pattern("123abc", r"^\d\d\d"));
         assert!(match_pattern("cat", "[^abc]"));
+    }
+
+    #[test]
+    fn end_anchor() {
+        assert!(match_pattern("dog", "dog$"));
+        assert!(match_pattern("hotdog", "dog$"));
+        assert!(!match_pattern("dogs", "dog$"));
+        assert!(match_pattern("abc123", r"\d\d\d$"));
+        assert!(!match_pattern("abc123@", r"\w\w\w$"));
+        assert!(match_pattern("abc123cde", r"\w\w\w$"));
+        assert!(match_pattern("dog", "^dog$"));
+        assert!(!match_pattern("hotdog", "^dog$"));
     }
 }
