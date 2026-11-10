@@ -2,23 +2,69 @@ use std::env;
 use std::io;
 use std::process;
 
-fn match_pattern(input_line: &str, pattern: &str) -> bool {
-    if pattern == r"\d" {
-        input_line.chars().any(|c| is_digit(c))
-    } else if pattern == r"\w" {
-        input_line.chars().any(|c| is_word(c))
-    } else if let Some(group) = pattern.strip_prefix('[')
-        .and_then(|p| p.strip_suffix(']')) {
-        if let Some(negated) = group.strip_prefix('^') {
-            input_line.chars().any(|c| !negated.contains(c))
-        } else {
-            input_line.chars().any(|c| group.contains(c))
-        }
-    } else if pattern.chars().count() == 1 {
-        input_line.contains(pattern)
-    } else {
-        panic!("Unhandled pattern: {}", pattern)
+enum Token {
+    Literal(char),
+    Digit,          // \d
+    Word,           // \w
+    Group {         // [abc], [^abc]
+        chars: Vec<char>,
+        negated: bool
     }
+}
+
+impl Token {
+    fn matches(&self, c: char) -> bool {
+        match self {
+            Token::Literal(l) => *l == c,
+            Token::Digit => c.is_ascii_digit(),
+            Token::Word => c.is_ascii_alphanumeric() || c == '_',
+            Token::Group { chars, negated} => chars.contains(&c) != *negated,
+        }
+    }
+}
+
+fn parse(pattern: &str) -> Vec<Token> {
+    let chars: Vec<char> = pattern.chars().collect();
+    let mut tokens = Vec::new();
+    let mut i = 0;
+    while i < chars.len() {
+        match chars[i] {
+            '\\' => {
+                let next = *chars.get(i + 1).expect("trailing backslash");
+                tokens.push(match next {
+                    'd' => Token::Digit,
+                    'w' => Token::Word,
+                    other => Token::Literal(other), // e.g. \\ or \[
+                });
+                i += 2;
+            }
+            '[' => {
+                let end = i + chars[i..].iter().position(|&c| c == ']').expect("unclosed [");
+                let mut inner = &chars[i + 1..end];
+                let negated = inner.first() == Some(&'^');
+                if negated { inner = &inner[1..]; }
+                tokens.push(Token::Group { chars: inner.to_vec(), negated });
+                i = end + 1;
+            }
+            c => { tokens.push(Token::Literal(c)); i += 1; }
+        }
+    }
+    tokens
+}
+fn match_here(input: &[char], tokens: &[Token]) -> bool {
+    match tokens.split_first() {
+        None => true, // every token has matched
+        Some((tok, rest)) => match input.split_first() {
+            Some((&c, input_rest)) if tok.matches(c) => match_here(input_rest, rest),
+            _ => false,
+        },
+    }
+}
+
+fn match_pattern(input_line: &str, pattern: &str) -> bool {
+    let tokens = parse(pattern);
+    let input: Vec<char> = input_line.chars().collect();
+    (0..=input.len()).any(|start| match_here(&input[start..], &tokens))
 }
 
 // Usage: echo <input_text> | your_program.sh -E <pattern>
@@ -41,14 +87,6 @@ fn main() {
     } else {
         process::exit(1)
     }
-}
-
-fn is_digit(c: char) -> bool {
-    c.is_ascii_digit()
-}
-
-fn is_word(c: char) -> bool {
-    c.is_ascii_alphanumeric() || c == '_'
 }
 
 #[cfg(test)]
@@ -80,5 +118,15 @@ mod tests {
         assert!(match_pattern("cat", "[^abc]"));
         assert!(!match_pattern("cab", "[^abc]"));
         assert!(match_pattern("apple", "[^abc]"));
+    }
+
+    #[test]
+    fn sequences() {
+        assert!(match_pattern("1 apple", r"\d apple"));
+        assert!(!match_pattern("1 orange", r"\d apple"));
+        assert!(match_pattern("I got 100 apples from the store", r"\d\d\d apples"));
+        assert!(!match_pattern("I got 1 apple from the store", r"\d\d\d apples"));
+        assert!(match_pattern("4 cats", r"\d \w\w\ws"));
+        assert!(!match_pattern("1 dog", r"\d \w\w\ws"));
     }
 }
