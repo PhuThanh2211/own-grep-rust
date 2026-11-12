@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Token {
     Literal(char),
     Digit,                                     // \d
@@ -17,7 +17,7 @@ impl Token {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Quant {
     pub min: usize,
     pub max: Option<usize>
@@ -26,9 +26,10 @@ pub struct Quant {
 impl Quant {
     pub const ONE: Quant = Quant { min: 1, max: Some(1) };
     pub const ONE_OR_MORE: Quant = Quant { min: 1, max: None };
+    pub const ZERO_OR_ONE: Quant = Quant { min: 0, max: Some(1) };
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Piece {
     pub token: Token,
     pub quant: Quant

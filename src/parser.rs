@@ -78,8 +78,53 @@ impl Parser {
     fn parse_quant(&mut self) -> Quant {
         if self.eat('+') {
             Quant::ONE_OR_MORE
+        } else if self.eat('?') {
+            Quant::ZERO_OR_ONE
         } else {
             Quant::ONE
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ast::{Piece, Quant, Token};
+
+    fn pieces(p: &str) -> Vec<Piece> {
+        Parser::new(p).parse().unwrap().pieces
+    }
+
+    #[test]
+    fn parses_escapes_and_quantifiers() {
+        assert_eq!(
+            pieces(r"\d+a"),
+            vec![
+                Piece { token: Token::Digit, quant: Quant::ONE_OR_MORE },
+                Piece { token: Token::Literal('a'), quant: Quant::ONE },
+            ]
+        );
+    }
+
+    #[test]
+    fn parses_negated_group() {
+        assert_eq!(
+            pieces("[^ab]")[0].token,
+            Token::Group { chars: vec!['a', 'b'], negated: true }
+        );
+    }
+
+    #[test]
+    fn anchors() {
+        let r = Parser::new("^a$").parse().unwrap();
+        assert!(r.start_anchored && r.end_anchored);
+        let r = Parser::new(r"a\$").parse().unwrap();
+        assert!(!r.end_anchored);
+    }
+
+    #[test]
+    fn errors() {
+        assert!(Parser::new("[abc").parse().is_err());
+        assert!(Parser::new(r"abc\").parse().is_err());
     }
 }

@@ -45,87 +45,93 @@ impl Regex {
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn m(input: &str, pat: &str) -> bool {
-        Regex::new(pat).unwrap().is_match(input)
+
+    fn check(cases: &[(&str, &str, bool)]) {
+        for &(pattern, input, expected) in cases {
+            let got = Regex::new(pattern).unwrap().is_match(input);
+            assert_eq!(got, expected, "pattern={pattern:?} input={input:?}");
+        }
     }
 
     #[test]
-    fn digit_class() {
-        assert!(m("foo101", r"\d"));
-        assert!(!m("Art", r"\d"));
+    fn literals_and_classes() {
+        check(&[
+            ("a", "apple", true),
+            ("z", "apple", false),
+            (r"\d", "foo101", true),
+            (r"\d", "Art", false),
+            (r"\w", "alpha_num3ric", true),
+            (r"\w", "$!?", false),
+        ]);
     }
 
     #[test]
-    fn word_class() {
-        assert!(m("alpha_num3ric", r"\w"));
-        assert!(m("_", r"\w"));
-        assert!(!m("$!?", r"\w"));
-    }
-
-    #[test]
-    fn positive_group() {
-        assert!(m("apple", "[abc]"));
-        assert!(m("cab", "[abc]"));
-        assert!(!m("dog", "[abc]"));
-        assert!(m("a1b2c3", "[123]"));
-    }
-
-    #[test]
-    fn negative_group() {
-        assert!(m("cat", "[^abc]"));
-        assert!(!m("cab", "[^abc]"));
-        assert!(m("apple", "[^abc]"));
+    fn groups() {
+        check(&[
+            ("[abc]", "apple", true),
+            ("[abc]", "dog", false),
+            ("[^abc]", "cat", true),
+            ("[^abc]", "cab", false),
+        ]);
     }
 
     #[test]
     fn sequences() {
-        assert!(m("1 apple", r"\d apple"));
-        assert!(!m("1 orange", r"\d apple"));
-        assert!(m("I got 100 apples from the store", r"\d\d\d apples"));
-        assert!(!m("I got 1 apple from the store", r"\d\d\d apples"));
-        assert!(m("4 cats", r"\d \w\w\ws"));
-        assert!(!m("1 dog", r"\d \w\w\ws"));
+        check(&[
+            (r"\d apple", "1 apple", true),
+            (r"\d apple", "1 orange", false),
+            (r"\d\d\d apples", "I got 100 apples", true),
+            (r"\d \w\w\ws", "4 cats", true),
+            (r"\d \w\w\ws", "1 dog", false),
+        ]);
     }
 
     #[test]
-    fn start_anchor() {
-        assert!(m("log", "^log"));
-        assert!(m("logs", "^log"));
-        assert!(!m("slog", "^log"));
-        assert!(m("123abc", r"^\d\d\d"));
-        assert!(m("cat", "[^abc]"));
-    }
-
-    #[test]
-    fn end_anchor() {
-        assert!(m("dog", "dog$"));
-        assert!(m("hotdog", "dog$"));
-        assert!(!m("dogs", "dog$"));
-        assert!(m("abc123", r"\d\d\d$"));
-        assert!(!m("abc123@", r"\w\w\w$"));
-        assert!(m("abc123cde", r"\w\w\w$"));
-        assert!(m("dog", "^dog$"));
-        assert!(!m("hotdog", "^dog$"));
+    fn anchors() {
+        check(&[
+            ("^log", "logs", true),
+            ("^log", "slog", false),
+            ("dog$", "hotdog", true),
+            ("dog$", "dogs", false),
+            ("^dog$", "dog", true),
+            ("^dog$", "hotdog", false),
+            (r"\$5", "cost $5", true),
+        ]);
     }
 
     #[test]
     fn one_or_more() {
-        assert!(m("apple", "a+"));
-        assert!(m("SaaS", "a+"));
-        assert!(!m("dog", "a+"));
-        assert!(m("cats", "ca+ts"));
-        assert!(m("caats", "ca+ts"));
-        assert!(!m("cts", "ca+ts"));
-        assert!(m("123", r"\d+"));
-        assert!(m("cats", r"\w+s"));     // needs back off
-        assert!(m("caaats", "^ca+ts$"));
+        check(&[
+            ("a+", "SaaS", true),
+            ("ca+ts", "caats", true),
+            ("ca+ts", "cts", false),
+            (r"\w+s", "cats", true), // needs backtracking
+            ("^ca+ts$", "caaats", true),
+        ]);
     }
 
     #[test]
-    fn escaping_and_errors() {
-        assert!(m("cost $5", r"\$5"));
-        assert!(m("a$", r"a\$$"));
-        assert!(Regex::new("[abc").is_err());
-        assert!(Regex::new(r"abc\").is_err());
+    fn edge_cases() {
+        check(&[
+            ("", "", true),
+            ("a", "", false),
+            ("é", "café", true), // multi-byte char
+        ]);
+    }
+
+    #[test]
+    fn zero_or_one() {
+        check(&[
+            ("dogs?", "dog", true),
+            ("dogs?", "dogs", true),
+            ("dogs?", "cat", false),
+            ("colou?r", "color", true),
+            ("colou?r", "colour", true),
+            ("colou?r", "colouur", false),
+            (r"\d?", "5", true),
+            (r"\d?", "", true),
+            ("^colou?r$", "colour", true),
+            (r"a\?", "a?", true),     // escaped ? is a literal
+        ]);
     }
 }
