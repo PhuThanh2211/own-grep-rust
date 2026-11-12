@@ -1,6 +1,7 @@
 #[derive(Debug, PartialEq)]
 pub enum Token {
     Literal(char),
+    Any,                                       // .
     Digit,                                     // \d
     Word,                                      // \w
     Group { chars: Vec<char>, negated: bool }, // [abc], [^abc]
@@ -10,6 +11,7 @@ impl Token {
     pub fn matches(&self, c: char) -> bool {
         match self {
             Token::Literal(l) => *l == c,
+            Token::Any => c != '\n',
             Token::Digit => c.is_ascii_digit(),
             Token::Word => c.is_ascii_alphanumeric() || c == '_',
             Token::Group { chars, negated } => chars.contains(&c) != *negated,

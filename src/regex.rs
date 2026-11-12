@@ -134,4 +134,22 @@ mod tests {
             (r"a\?", "a?", true),     // escaped ? is a literal
         ]);
     }
+
+    #[test]
+    fn wildcard() {
+        check(&[
+            ("d.g", "dog", true),
+            ("d.g", "dag", true),
+            ("d.g", "d9g", true),
+            ("d.g", "cog", false),
+            ("d.g", "dg", false),
+            ("...", "cat", true),
+            ("...", "ca", false),
+            (r".\d.", "a1b", true),
+            ("g.+gol", "goøö0Ogol", true), // . with + and non-ASCII
+            (r"a\.b", "a.b", true),        // escaped dot is literal
+            (r"a\.b", "axb", false),
+            ("a[.]b", "axb", false),       // dot in group is literal
+        ]);
+    }
 }

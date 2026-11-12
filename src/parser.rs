@@ -58,6 +58,7 @@ impl Parser {
                 other => Token::Literal(other), // \\ \[ \$ \+ ...
             },
             '[' => self.parse_group()?,
+            '.' => Token::Any,
             c => Token::Literal(c),
         })
     }
@@ -120,6 +121,12 @@ mod tests {
         assert!(r.start_anchored && r.end_anchored);
         let r = Parser::new(r"a\$").parse().unwrap();
         assert!(!r.end_anchored);
+    }
+
+    #[test]
+    fn dot_wildcard() {
+        assert_eq!(pieces(".")[0].token, Token::Any);
+        assert_eq!(pieces(r"\.")[0].token, Token::Literal('.'));
     }
 
     #[test]
