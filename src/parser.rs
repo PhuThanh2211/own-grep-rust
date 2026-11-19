@@ -3,30 +3,62 @@ use crate::regex::Regex;
 
 pub struct Parser {
     chars: Vec<char>,
-    pos: usize
+    pos: usize,
+    end_anchored: bool,
 }
 
 impl Parser {
     pub fn new(pattern: &str) -> Self {
-        Parser { chars: pattern.chars().collect(), pos: 0 }
+        Parser {
+            chars: pattern.chars().collect(), pos: 0, end_anchored: false
+        }
     }
 
     pub fn parse(mut self) -> Result<Regex, String> {
         let start_anchored = self.eat('^');
-        let mut end_anchored = false;
-        let mut pieces = Vec::new();
+        let mut branches = self.parse_branches()?;
 
-        while let Some(c) = self.next() {
-            if c == '$' && self.peek().is_none() {
-                end_anchored = true;
+        // parse_branches stops at `)`; at top level that `)` has no matching `(`
+        if self.peek().is_some() {
+            return Err("unmatched )".into());
+        }
+
+        // `cat|dog` without parens: wrap the branches in one Alt piece
+        let pieces = if branches.len() == 1 {
+            branches.pop().unwrap()
+        } else {
+            vec![Piece { token: Token::Alt(branches), quant: Quant::ONE }]
+        };
+
+        Ok(Regex { pieces, start_anchored, end_anchored: self.end_anchored })
+    }
+
+    fn parse_branches(&mut self) -> Result<Vec<Vec<Piece>>, String> {
+        let mut branches = vec![self.parse_sequence()?];
+        while self.eat('|') {
+            branches.push(self.parse_sequence()?);
+        }
+        Ok(branches)
+    }
+
+    fn parse_sequence(&mut self) -> Result<Vec<Piece>, String> {
+        let mut pieces = Vec::new();
+        while let Some(c) = self.peek() {
+            if c == '|' || c == ')' {
                 break;
             }
+
+            self.next();
+            if c == '$' && self.peek().is_none() {
+                self.end_anchored = true;
+                break;
+            }
+
             let token = self.parse_token(c)?;
             let quant = self.parse_quant();
             pieces.push(Piece { token, quant });
         }
-
-        Ok(Regex { pieces, start_anchored, end_anchored })
+        Ok(pieces)
     }
 
     fn peek(&self) -> Option<char> {
@@ -59,6 +91,13 @@ impl Parser {
             },
             '[' => self.parse_group()?,
             '.' => Token::Any,
+            '(' => {
+              let branches = self.parse_branches()?;
+                if !self.eat(')') {
+                    return Err("unclosed (".into());
+                }
+                Token::Alt(branches)
+            },
             c => Token::Literal(c),
         })
     }
@@ -133,5 +172,7 @@ mod tests {
     fn errors() {
         assert!(Parser::new("[abc").parse().is_err());
         assert!(Parser::new(r"abc\").parse().is_err());
+        assert!(Parser::new("(cat|dog").parse().is_err());
+        assert!(Parser::new("cat)").parse().is_err());
     }
 }

@@ -5,6 +5,7 @@ pub enum Token {
     Digit,                                     // \d
     Word,                                      // \w
     Group { chars: Vec<char>, negated: bool }, // [abc], [^abc]
+    Alt(Vec<Vec<Piece>>),                      // (a|b|c): each branch is a sequence of pieces
 }
 
 impl Token {
@@ -15,6 +16,7 @@ impl Token {
             Token::Digit => c.is_ascii_digit(),
             Token::Word => c.is_ascii_alphanumeric() || c == '_',
             Token::Group { chars, negated } => chars.contains(&c) != *negated,
+            Token::Alt(_) => false,
         }
     }
 }
