@@ -21,12 +21,23 @@ fn main() -> ExitCode {
         }
     };
 
-    let mut input = String::new();
-    io::stdin().read_line(&mut input).unwrap();
-    let input = input.trim_end_matches(['\n', '\r']);
+    let mut any_matched = false;
+    for line in io::stdin().lines() {
+        let line = match line {
+            Ok(l) => l,
+            Err(e) => {
+                eprintln!("error reading input: {e}");
+                return ExitCode::from(2);
+            }
+        };
 
-    if regex.is_match(input) {
-        println!("{input}");
+        if regex.is_match(&line) {
+            println!("{line}");
+            any_matched = true;
+        }
+    }
+
+    if any_matched {
         ExitCode::SUCCESS
     } else {
         ExitCode::FAILURE
