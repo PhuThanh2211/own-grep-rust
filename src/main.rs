@@ -26,6 +26,7 @@ fn main() -> ExitCode {
     let input = input.trim_end_matches(['\n', '\r']);
 
     if regex.is_match(input) {
+        println!("{input}");
         ExitCode::SUCCESS
     } else {
         ExitCode::FAILURE
